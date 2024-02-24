@@ -1,0 +1,70 @@
+syntax = "proto3";
+
+package wallet.api;
+
+option go_package = "api/";
+
+message PingRequest {
+    string message = 1;
+}
+
+message PingResponse {
+  string message = 1;
+}
+
+message CreateRequest {
+  string accountID = 1;
+  string currency = 2;
+}
+
+message CreateResponse {
+  Wallet wallet = 1;
+}
+
+message ListRequest {
+  string accountID = 1;
+}
+
+message ListResponse {
+  repeated Wallet wallet = 1;
+}
+
+message GetRequest {
+  int32 walletID = 1;
+}
+
+message GetResponse {
+  Wallet wallet = 1;
+}
+
+message Wallet {
+    // wallet id 
+    int32 id = 1;
+    // Customer identifier (for simlicity of example it just string value)
+    string customer = 2;
+     // Amount available 
+    // A positive integer representing how much to funds customer has in the smallest currency unit
+    // (e.g., 100 cents to charge $1.00 or 100 to charge ¥100, a zero-decimal currency).
+    int64 amount = 3;
+    //Three-letter ISO currency code, in lowercase.
+    string currency = 4;
+};
+
+message Transaction {
+  // idempotency key
+  string id = 1;
+  // wallet on which transaction should be applied
+  int32 walletID = 2;
+  // amount that should be added/removed from wallet
+  int64 amount = 3;
+  //Three-letter ISO currency code, in lowercase.
+  string currency = 4;
+}
+
+service WalletService {
+    rpc Ping(PingRequest) returns (PingResponse) {}
+    rpc Create(CreateRequest) returns (CreateResponse) {}
+    rpc List(ListRequest) returns (ListResponse) {}
+    rpc Get(GetRequest) returns (GetResponse) {}
+    rpc ProcessTransaction(Transaction) returns (Wallet) {}
+};

@@ -1,0 +1,31 @@
+services:
+  wallet_server:
+    build:
+      context: .
+      target: final
+    ports:
+      - 50051:50051
+    depends_on:
+      - migrate
+
+  postgres:
+    image: postgres
+    ports:
+      - 5432:5432
+    volumes:
+      - ~/apps/postgres:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=wallet
+
+  migrate:
+    image: migrate/migrate
+    depends_on:
+      - postgres
+
+    volumes:
+      - ./resources/migrations:/migrations
+    # here instead of localhost as the host we use databaseservicename as that is the name we gave to the postgres service
+    command:
+      [ "-path", "/migrations", "-database",  "postgres://postgres:postgres@postgres:5432/wallet?sslmode=disable", "up" ]
