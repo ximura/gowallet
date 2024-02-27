@@ -14,6 +14,60 @@ import (
 	"gotest.tools/v3/assert"
 )
 
+func TestCreate(t *testing.T) {
+	ctx := context.Background()
+	ctrl := gomock.NewController(t)
+	account := uuid.New()
+
+	tests := map[string]struct {
+		currency domain.Currency
+		err      error
+		mocks    func(c domain.Currency, m *mocks.MockWalletRepository)
+	}{
+		"usd": {
+			currency: "usd",
+			err:      nil,
+			mocks: func(c domain.Currency, m *mocks.MockWalletRepository) {
+				m.EXPECT().Create(ctx, account, c).Return(domain.Wallet{}, nil)
+			},
+		},
+		"eur": {
+			currency: "EUR",
+			err:      nil,
+			mocks: func(c domain.Currency, m *mocks.MockWalletRepository) {
+				m.EXPECT().Create(ctx, account, c).Return(domain.Wallet{}, nil)
+			},
+		},
+		"jpy": {
+			currency: "jPy",
+			err:      nil,
+			mocks: func(c domain.Currency, m *mocks.MockWalletRepository) {
+				m.EXPECT().Create(ctx, account, c).Return(domain.Wallet{}, nil)
+			},
+		},
+		"error": {
+			currency: "test",
+			err:      service.ErrUnsuportedCurrency,
+			mocks: func(c domain.Currency, m *mocks.MockWalletRepository) {
+			},
+		},
+	}
+	for name, tt := range tests {
+		tt := tt
+		t.Run(name, func(t *testing.T) {
+			repository := mocks.NewMockWalletRepository(ctrl)
+			wallet := service.NewWalletService(repository)
+			tt.mocks(tt.currency, repository)
+			_, err := wallet.Create(ctx, account, tt.currency)
+			if tt.err == nil {
+				assert.NilError(t, err)
+			} else {
+				assert.ErrorContains(t, err, tt.err.Error())
+			}
+		})
+	}
+}
+
 func TestProcessTransaction(t *testing.T) {
 	ctx := context.Background()
 	ctrl := gomock.NewController(t)
@@ -22,34 +76,44 @@ func TestProcessTransaction(t *testing.T) {
 		ID:       uuid.New(),
 		WalletID: 1,
 		Amount:   100,
-		Currency: "usd",
 	}
 
 	tests := map[string]struct {
-		err   error
-		mocks func(m *mocks.MockWalletRepository)
+		currency domain.Currency
+		err      error
+		mocks    func(m *mocks.MockWalletRepository)
 	}{
 		"can't get transaction": {
-			err: fmt.Errorf("can't get transaction: %w", tErr),
+			currency: "usd",
+			err:      fmt.Errorf("can't get transaction: %w", tErr),
 			mocks: func(m *mocks.MockWalletRepository) {
 				m.EXPECT().HasTransaction(ctx, transaction).Return(true, tErr)
 			},
 		},
+		"ErrUnsuportedCurrency": {
+			currency: "test",
+			err:      service.ErrUnsuportedCurrency,
+			mocks: func(m *mocks.MockWalletRepository) {
+			},
+		},
 		"ErrDuplicateTransaction": {
-			err: service.ErrDuplicateTransaction,
+			currency: "usd",
+			err:      service.ErrDuplicateTransaction,
 			mocks: func(m *mocks.MockWalletRepository) {
 				m.EXPECT().HasTransaction(ctx, transaction).Return(true, nil)
 			},
 		},
 		"can't get wallet for": {
-			err: fmt.Errorf("can't get wallet %d: %w", transaction.WalletID, tErr),
+			currency: "usd",
+			err:      fmt.Errorf("can't get wallet %d: %w", transaction.WalletID, tErr),
 			mocks: func(m *mocks.MockWalletRepository) {
 				m.EXPECT().HasTransaction(ctx, transaction).Return(false, nil)
 				m.EXPECT().Get(ctx, transaction.WalletID).Return(domain.Wallet{}, tErr)
 			},
 		},
 		"wallet currency different from transaction": {
-			err: fmt.Errorf("wallet currency different from transaction, %s != %s", "eur", transaction.Currency),
+			currency: "usd",
+			err:      fmt.Errorf("wallet currency different from transaction, %s != %s", "eur", transaction.Currency),
 			mocks: func(m *mocks.MockWalletRepository) {
 				m.EXPECT().HasTransaction(ctx, transaction).Return(false, nil)
 				m.EXPECT().Get(ctx, transaction.WalletID).Return(domain.Wallet{
@@ -58,7 +122,8 @@ func TestProcessTransaction(t *testing.T) {
 			},
 		},
 		"ErrInvalitTransactionAmount": {
-			err: service.ErrInvalitTransactionAmount,
+			currency: "usd",
+			err:      service.ErrInvalitTransactionAmount,
 			mocks: func(m *mocks.MockWalletRepository) {
 				m.EXPECT().HasTransaction(ctx, transaction).Return(false, nil)
 				m.EXPECT().Get(ctx, transaction.WalletID).Return(domain.Wallet{
@@ -68,7 +133,8 @@ func TestProcessTransaction(t *testing.T) {
 			},
 		},
 		"Transaction error": {
-			err: tErr,
+			currency: "usd",
+			err:      tErr,
 			mocks: func(m *mocks.MockWalletRepository) {
 				m.EXPECT().HasTransaction(ctx, transaction).Return(false, nil)
 				m.EXPECT().Get(ctx, transaction.WalletID).Return(domain.Wallet{
@@ -79,7 +145,8 @@ func TestProcessTransaction(t *testing.T) {
 			},
 		},
 		"Ok": {
-			err: nil,
+			currency: "usd",
+			err:      nil,
 			mocks: func(m *mocks.MockWalletRepository) {
 				m.EXPECT().HasTransaction(ctx, transaction).Return(false, nil)
 				m.EXPECT().Get(ctx, transaction.WalletID).Return(domain.Wallet{
@@ -95,6 +162,7 @@ func TestProcessTransaction(t *testing.T) {
 		tt := tt
 		t.Run(name, func(t *testing.T) {
 			repository := mocks.NewMockWalletRepository(ctrl)
+			transaction.Currency = tt.currency
 			tt.mocks(repository)
 			wallet := service.NewWalletService(repository)
 

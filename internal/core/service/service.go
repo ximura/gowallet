@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/ximura/gowallet/internal/core/domain"
@@ -14,6 +16,9 @@ var _ ports.WalletService = (*WalletService)(nil)
 
 var ErrInvalitTransactionAmount = errors.New("invalid transaction amount")
 var ErrDuplicateTransaction = errors.New("duplicate transaction")
+var ErrUnsuportedCurrency = errors.New("unsupported currency")
+
+var SupportedCurrency = []string{"usd", "eur", "uah", "jpy"}
 
 type WalletService struct {
 	repo ports.WalletRepository
@@ -24,6 +29,10 @@ func NewWalletService(repo ports.WalletRepository) WalletService {
 }
 
 func (w *WalletService) Create(ctx context.Context, account uuid.UUID, currency domain.Currency) (domain.Wallet, error) {
+	if !isCurrencySupported(currency) {
+		return domain.Wallet{}, ErrUnsuportedCurrency
+	}
+
 	return w.repo.Create(ctx, account, currency)
 }
 
@@ -36,6 +45,10 @@ func (w *WalletService) List(ctx context.Context, account uuid.UUID) ([]domain.W
 }
 
 func (w *WalletService) ProcessTransaction(ctx context.Context, transaction domain.Transaction) (domain.Wallet, error) {
+	if !isCurrencySupported(transaction.Currency) {
+		return domain.Wallet{}, ErrUnsuportedCurrency
+	}
+
 	ok, err := w.repo.HasTransaction(ctx, transaction)
 	if err != nil {
 		return domain.Wallet{}, fmt.Errorf("can't get transaction: %w", err)
@@ -59,4 +72,9 @@ func (w *WalletService) ProcessTransaction(ctx context.Context, transaction doma
 	}
 
 	return w.repo.ProcessTransaction(ctx, transaction)
+}
+
+func isCurrencySupported(currency domain.Currency) bool {
+	c := strings.ToLower(string(currency))
+	return slices.Contains(SupportedCurrency, c)
 }
