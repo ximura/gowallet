@@ -25,12 +25,17 @@ audit:
 ## db/migrations/new name=$1: create a new migration
 .PHONY: db/docker
 db/docker:
-	docker run --name  wallet-pg  -p 5432:5432 -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=wallet -d -v "./resources/migrations":/docker-entrypoint-initdb.d postgres
+	docker run --name  ${BINARY_NAME}-pg  -p 5432:5432 -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=${BINARY_NAME} -d -v "./resources/migrations":/docker-entrypoint-initdb.d postgres
 
 ## db/migrations/new name=$1: create a new migration
 .PHONY: db/migrations/new
 db/migrations/new:
 	go run -tags 'pg' github.com/golang-migrate/migrate/v4/cmd/migrate@latest create -seq -ext=.sql -dir=./resources/migrations ${name}
+
+## db/generate: run jet code generation
+.PHONY: db/generate
+db/generate:
+	go run -tags 'jet' github.com/go-jet/jet/v2/cmd/jet@latest -dsn=postgresql://postgres:postgres@localhost:5432/${BINARY_NAME}?sslmode=disable -schema=public -path=./internal/repository/jet
 
 ## grpcui: start grpcui on port 50051
 .PHONY: grpcui
@@ -41,7 +46,6 @@ grpcui:
 .PHONY: gogenerate
 gogenerate:: 
 	protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative api/*.proto
-#go run -tags 'jet' github.com/go-jet/jet/v2/cmd/jet@latest -dsn=postgresql://postgres:postgres@localhost:5432/wallet?sslmode=disable -schema=public -path=./internal/repository/walletrepo/jet
 	go generate ./...
 
 ## build: build the application
@@ -63,5 +67,4 @@ test/cover:
 
 ## run: run the  application
 .PHONY: run
-run: build
-	./bin/${BINARY_NAME}
+	go run ${MAIN_PACKAGE_PATH}
